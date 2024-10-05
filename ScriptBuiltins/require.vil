@@ -1,0 +1,126 @@
+val get_text = fs.file.get_text;
+val file_exists = fs.file.exists;
+val dir_exists = fs.dir.exists;
+val dname = fs.path.get_dname;
+val fname = fs.path.get_fname;
+val strace = debug.strace;
+val path_cmb = fs.path.cmb;
+val evil_compile = evil.compile;
+
+val attempted_imports = array { };
+
+loc fn get_import_base_data() {
+  val stack_trace = strace(true);
+  val caller_frame = stack_trace[2];
+  
+  val caller_file_name = caller_frame.def_in_file;
+  
+  ret {
+    base_dir: dname(caller_file_name),
+    file_name: fname(caller_file_name)
+  };
+}
+
+loc fn build_error_message(full_path, log) {
+  rw val msg = "require: Failed to compile the file '" + full_path + "':\n";
+
+  if (log is Array) {
+    val sev = tbl.invert(evil.compiler.severity);
+    
+    each (rw val i, v : log) {
+      msg += "  ";
+
+      if (v.file_name is String) {
+        if (#v.file_name) {
+          msg += v.file_name;
+        }
+      }
+
+      if (v.line > 0) {
+        msg += " :: line " + @v.line;
+
+        if (v.column > 0) {
+          msg += ", column " + @v.column;
+        }
+      }
+
+      msg += " :: " + sev[v.severity];
+      msg += " :: " + v.message;
+      msg += " :: " + v.file_name;
+      
+      if (i < #log - 1) {
+        msg += "\n";
+      }
+    }
+  }
+  
+  ret msg;
+}
+
+loc fn try_compile_source(full_path) {
+  val source = get_text(full_path);
+  val result = evil_compile(source, full_path);
+
+  if (result is Nil) {
+    throw error { msg: "require: Failed to compile the file '" + full_path + ": evil.compile returned Nil." };
+  }
+  
+  if (!result.success) {
+    throw error { msg: build_error_message(full_path, result.log) };
+  }
+  
+  ret result.chunk;
+}
+
+loc fn try_directory_init(dir_path) {
+  val init_file_path = path_cmb(dir_path, "init.vil");
+  val libname_file_path = path_cmb(dir_path, fname(dir_path) + ".vil");
+  
+  arr.push(attempted_imports, init_file_path);
+  if (file_exists(init_file_path)) {
+    ret try_compile_source(init_file_path);
+  }
+  
+  arr.push(attempted_imports, libname_file_path);
+  if (file_exists(libname_file_path)) {
+    ret try_compile_source(libname_file_path);
+  }
+}
+
+loc fn try_file_init(file_path) {
+  val lib_file_path = file_path + ".vil";
+  
+  arr.push(attempted_imports, lib_file_path);
+  if (file_exists(lib_file_path)) {
+    ret try_compile_source(lib_file_path);
+  }
+}
+
+fn require(path) {
+  val import_data = get_import_base_data(); 
+  val fs_path = str.replace(path, '.', '/');
+  
+  val local_path = path_cmb(import_data.base_dir, fs_path);
+  
+  rw val chunk;
+  if ((chunk = try_file_init(local_path)) is Function) -> chunk();
+  if ((chunk = try_directory_init(local_path)) is Function) -> chunk();
+  
+  if (__IMPORT_PATHS is Array) {
+    each (rw val _, v : __IMPORT_PATHS) {
+      if (v !is String) skip;
+      
+      val external_path = path_cmb(v, fs_path);
+      
+      if ((chunk = try_file_init(external_path)) is Function) -> chunk();
+      if ((chunk = try_directory_init(external_path)) is Function) -> chunk();
+    }
+  }
+  
+  rw val msg = "require: Unable to find the requested file '" + path + "' in any of the known lookup paths:\n";
+  each (rw val _, v : attempted_imports) {
+    msg += "  " + v + "\n";
+  }
+  
+  throw error { msg: msg };
+}
