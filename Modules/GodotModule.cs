@@ -38,7 +38,8 @@ public class GodotModule : RuntimeModule
     )]
     private static DynamicValue GlobalizePath(Fiber _, params DynamicValue[] args)
     {
-        args.ExpectExactly(1);
-        return ProjectSettings.GlobalizePath(args[0].String);
+        args.ExpectExactly(1)
+            .ExpectStringAt(0, out var path);
+        return ProjectSettings.GlobalizePath(path);
     }
 }
