@@ -69,6 +69,8 @@ public sealed class EvilRuntime
         modules.Add(RegisterModule<StringModule>(out _));
         modules.Add(RegisterModule<TableModule>(out _));
         modules.Add(RegisterModule<TimeModule>(out _));
+        modules.Add(RegisterModule<GodotModule>(out _));
+        modules.Add(RegisterModule<FileAccessModule>(out _));
 
         return modules;
     }

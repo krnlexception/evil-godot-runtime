@@ -24,4 +24,21 @@ public class GodotModule : RuntimeModule
 
         return DynamicValue.Nil;
     }
+
+    [RuntimeModuleFunction("globalize_path")]
+    [EvilDocFunction(
+        "Returns globalized path, from res:// or user:// into OS path.",
+        Returns = "Globalized path",
+        ReturnType = DynamicValueType.String
+    )]
+    [EvilDocArgument(
+        "path",
+        "Godot local path",
+        DynamicValueType.String
+    )]
+    private static DynamicValue GlobalizePath(Fiber _, params DynamicValue[] args)
+    {
+        args.ExpectExactly(1);
+        return ProjectSettings.GlobalizePath(args[0].String);
+    }
 }
