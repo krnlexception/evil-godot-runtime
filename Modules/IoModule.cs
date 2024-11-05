@@ -18,7 +18,7 @@ public class IoModule : RuntimeModule
         ReturnType = DynamicValueType.Number
     )]
     [EvilDocArgument(
-        "...",
+        "content",
         "__At least 1__ value to be printed.",
         CanBeNil = true
     )]
